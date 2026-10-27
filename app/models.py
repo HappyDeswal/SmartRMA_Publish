@@ -3,6 +3,7 @@ import json,re,threading,time
 import httpx
 from .domain import Observation
 from .images import vision_copy
+from .hardware import HardwareClassifier
 
 VISION_MODELS=('qwen3-vl:8b','llama3.2-vision:latest','moondream:latest')
 CHAT_MODELS=('qwen2.5:7b','qwen2.5-coder:14b','ornith:35b','llama3.1:8b')
@@ -22,6 +23,7 @@ class ModelUnavailable(Exception):pass
 class LocalModels:
     def __init__(self):
         self.lock=threading.Lock();self.state_lock=threading.Lock();self.states={}
+        self.hardware=HardwareClassifier.environment()
 
     def http(self,path,payload=None,timeout=3):
         if path not in {'/api/tags','/api/generate','/api/ps'}:raise ValueError('Unsupported local inference endpoint.')
@@ -49,7 +51,8 @@ class LocalModels:
         with self.state_lock:states={m:self.states.get(m,{'state':'untested'}) for m in (*VISION_MODELS,*CHAT_MODELS) if m in installed}
         return {'provider':'local_ollama','endpoint':'http://127.0.0.1:11434','vision_candidates':[m for m in VISION_MODELS if m in installed],
                 'chat_candidates':[m for m in CHAT_MODELS if m in installed],'model_states':states,
-                'inference_tested':any(v['state']=='ready' for v in states.values()),'busy':self.lock.locked()}
+                'inference_tested':any(v['state']=='ready' for v in states.values()),'busy':self.lock.locked(),
+                'hardware_classifier':self.hardware.health()}
 
     def select_model(self,selected,deadline):
         # Release only this application's supported idle model caches, never unrelated models.
@@ -78,7 +81,10 @@ class LocalModels:
                 payload={'model':model,'images':[image],'prompt':PROMPT,'stream':False,'think':False,
                          'keep_alive':0 if fallback else '2m','options':{'temperature':0,'num_predict':350,'num_ctx':4096}}
                 if fallback:payload['prompt']='Describe the visible PC hardware and visible defects only. Do not infer function, identity or warranty eligibility.'
-                else:payload['format']=Observation.model_json_schema()
+                else:
+                    schema=Observation.model_json_schema()
+                    schema['properties'].pop('hardware_hint',None)
+                    payload['format']=schema
                 try:
                     self.select_model(model,deadline)
                     remaining=deadline-time.monotonic()
@@ -89,7 +95,12 @@ class LocalModels:
                         self.record(model,True)
                         return self.inconclusive('Unstructured local fallback: '+text[:420]),model
                     cleaned=re.sub(r'^```(?:json)?\s*|\s*```$','',text).strip()
-                    observation=Observation.model_validate_json(cleaned)
+                    data=json.loads(cleaned)
+                    if not isinstance(data,dict):raise ValueError('Invalid observation object')
+                    # The LLM cannot supply or spoof the trained classifier's result.
+                    data.pop('hardware_hint',None)
+                    observation=Observation.model_validate(data)
+                    observation.hardware_hint=self.hardware.predict(raw)
                     self.record(model,True);return observation,model
                 except (httpx.HTTPError,ValueError,KeyError) as exc:self.record(model,False,type(exc).__name__)
         finally:self.lock.release()

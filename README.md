@@ -183,3 +183,21 @@ The demonstration set contains **20 attributed photos**, five per tier, with syn
 The included corpus has **26 local policy documents** and **1,423 indexed chunks** in the retained snapshot. Policy documents retain their publishers' rights; review their current region, date and product applicability. This repository does not grant new rights to third-party material.
 
 The application performs **screening and traceable review**. It does not issue refunds, manufacturer authorizations, shipping labels or external tickets. Photos cannot prove hidden electrical defects or purchase eligibility, and model confidence is not calibrated diagnostic accuracy. Passing tests is not a guarantee of zero defects or production readiness; independent evaluation and deployment acceptance remain necessary.
+
+## Optional hardware model trained in Colab
+
+The [hardware training workflow](training/README.md) and self-contained
+[Colab notebook](training/SmartRMA_Hardware_Training.ipynb) train a small
+MobileNetV3 classifier on versioned GPU, motherboard, RAM and SSD photographs.
+The prepared dataset contains 971 original images (679 train, 147 validation,
+145 test) after exact duplicate removal and near-duplicate grouping. Public
+source labels are hardware types; they are not damage or warranty labels.
+
+Download the Colab export, install `requirements-hardware.txt`, then run
+`python training/install_model.py /path/to/smartrma_hardware_bundle.zip` and
+restart the application. Node 3 serves the model locally through ONNX Runtime.
+Hardware recognition appears as an advisory in case history; the existing local
+vision LLM still assesses visible condition. Recognition scores do not replace
+condition confidence, affect return decisions, or bypass T4 human approval.
+See the training documentation for attribution, measured results and dataset
+limits. Training data and weights are excluded from source commits.

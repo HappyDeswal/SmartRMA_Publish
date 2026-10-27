@@ -25,3 +25,8 @@ htmlcov/
 # Diagnostic artifacts stay local
 /tests/artifacts/*
 !/tests/artifacts/.gitkeep
+
+# Training inputs, caches and learned weights stay out of source commits.
+/training/data/
+/training/runs/
+/training/*.zip

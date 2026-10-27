@@ -1,3 +1,20 @@
+# Hardware training and local integration verification - 28 October 2026
+
+- Trained an auxiliary MobileNetV3 Small hardware classifier on Colab Tesla T4.
+- 971 retained original images: 679 training, 147 validation, 145 held-out test.
+- Fine-tuned type recognition: 122/145 correct (84.14%); macro F1 0.8301.
+- Frozen ImageNet feature/centroid baseline: 75.17%; this is not a Qwen3-VL comparison.
+- GPU recall 52.17%, below its baseline recall; no claim of damage or RMA decision improvement.
+- ONNX/PyTorch parity passed in Colab; local ONNX matched all 145 Colab predictions.
+- 104 software regression tests passed, including corrupt-model fallback, output spoof protection,
+  advisory persistence contract, and proof that classifier hints cannot change tier decisions.
+- Three local services restarted with an empty active queue; all reported healthy.
+- Actual exported ONNX loaded in Node 3, with model and metrics checksums verified.
+- A live combined inference using local Qwen3-VL 8B and the trained ONNX model completed successfully.
+- Evidence and limitations: training/results/2026-10-28 and training/README.md.
+
+---
+
 # Publication verification — 28 October 2026
 
 The rebuilt application was prepared at the root of `HappyDeswal/SmartRMA_Publish` and verified from a clean publication checkout.

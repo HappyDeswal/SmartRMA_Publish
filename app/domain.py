@@ -40,12 +40,20 @@ class Intake(StrictModel):
     @property
     def cents(self): return int(self.value*100)
 
+class HardwareHint(StrictModel):
+    product_type: Product
+    score: float = Field(ge=0,le=1,allow_inf_nan=False)
+    model_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    advisory_only: Literal[True] = True
+    score_method: Literal['validation_temperature_scaled_not_condition_confidence'] = 'validation_temperature_scaled_not_condition_confidence'
+
 class Observation(StrictModel):
     hardware_visible: bool
     condition: Literal['clean','physical_damage','cosmetic_wear','tampered','uncertain']
     findings: str = Field(min_length=12,max_length=500)
     confidence: float = Field(ge=0,le=1,allow_inf_nan=False)
     anomaly_score: float = Field(ge=0,le=1,allow_inf_nan=False)
+    hardware_hint: HardwareHint | None = None
 
 class Credentials(StrictModel):
     username: str = Field(min_length=3,max_length=64,pattern=r'^[a-zA-Z0-9_.-]+$')
