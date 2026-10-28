@@ -38,8 +38,18 @@ class RemoteModels:
     inconclusive=staticmethod(LocalModels.inconclusive)
     def __init__(self):self.vision=NodeTransport('vision');self.policy=NodeTransport('policy')
     def health(self):
-        try:return self.vision.call('/models',timeout=5)
-        except NodeUnavailable:return {'provider':'local_ollama','vision_candidates':[],'chat_candidates':[],'model_states':{},'busy':False,'error':'Vision node unavailable'}
+        inventories={};errors={}
+        for role,node in [('vision',self.vision),('policy',self.policy)]:
+            try:inventories[role]=node.call('/models',timeout=5)
+            except NodeUnavailable:inventories[role]={};errors[role]=f'{role} node unavailable'
+        vision= inventories['vision'];policy=inventories['policy']
+        return {'provider':'local_ollama','endpoint':'http://127.0.0.1:11434',
+                'vision_candidates':vision.get('vision_candidates',[]),'chat_candidates':policy.get('chat_candidates',[]),
+                'model_states':{**vision.get('model_states',{}),**policy.get('model_states',{})},
+                'inference_tested':bool(vision.get('inference_tested') or policy.get('inference_tested')),
+                'busy':bool(vision.get('busy') or policy.get('busy')),
+                'hardware_classifier':vision.get('hardware_classifier'),
+                'execution_nodes':{'vision':'Node 3','policy_chat':'Node 2'},'node_errors':errors}
     def inspect(self,raw,deadline):
         budget=max(0,deadline-time.monotonic())
         if budget<=0:return self.inconclusive('Inspection budget exhausted.'),None

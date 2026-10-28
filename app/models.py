@@ -1,9 +1,10 @@
 """Fixed-loopback Ollama client. No cloud endpoints, proxy use or redirects."""
-import json,re,threading,time
+import json,os,re,threading,time
 import httpx
 from .domain import Observation
 from .images import vision_copy
 from .hardware import HardwareClassifier
+from .inference_lock import InferenceLock
 
 VISION_MODELS=('qwen3-vl:8b','llama3.2-vision:latest','moondream:latest')
 CHAT_MODELS=('qwen2.5:7b','qwen2.5-coder:14b','ornith:35b','llama3.1:8b')
@@ -21,9 +22,10 @@ class ModelBusy(Exception):pass
 class ModelUnavailable(Exception):pass
 
 class LocalModels:
-    def __init__(self):
-        self.lock=threading.Lock();self.state_lock=threading.Lock();self.states={}
-        self.hardware=HardwareClassifier.environment()
+    def __init__(self,role=None):
+        self.role=role
+        self.lock=InferenceLock(os.environ.get('HAPPY_INFERENCE_LOCK'));self.state_lock=threading.Lock();self.states={}
+        self.hardware=HardwareClassifier() if role=='policy' else HardwareClassifier.environment()
 
     def http(self,path,payload=None,timeout=3):
         if path not in {'/api/tags','/api/generate','/api/ps'}:raise ValueError('Unsupported local inference endpoint.')
@@ -48,9 +50,10 @@ class LocalModels:
 
     def health(self):
         installed=self.installed()
-        with self.state_lock:states={m:self.states.get(m,{'state':'untested'}) for m in (*VISION_MODELS,*CHAT_MODELS) if m in installed}
-        return {'provider':'local_ollama','endpoint':'http://127.0.0.1:11434','vision_candidates':[m for m in VISION_MODELS if m in installed],
-                'chat_candidates':[m for m in CHAT_MODELS if m in installed],'model_states':states,
+        candidates=VISION_MODELS if self.role=='vision' else CHAT_MODELS if self.role=='policy' else (*VISION_MODELS,*CHAT_MODELS)
+        with self.state_lock:states={m:self.states.get(m,{'state':'untested'}) for m in candidates if m in installed}
+        return {'provider':'local_ollama','endpoint':'http://127.0.0.1:11434','vision_candidates':[m for m in VISION_MODELS if m in installed and self.role!='policy'],
+                'chat_candidates':[m for m in CHAT_MODELS if m in installed and self.role!='vision'],'model_states':states,
                 'inference_tested':any(v['state']=='ready' for v in states.values()),'busy':self.lock.locked(),
                 'hardware_classifier':self.hardware.health()}
 

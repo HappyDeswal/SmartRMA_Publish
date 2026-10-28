@@ -36,6 +36,12 @@ def main():
     if 'HAPPY_ORIGIN' not in os.environ:os.environ['HAPPY_ORIGIN']=f'http://127.0.0.1:{args.port}'
     os.environ['HAPPY_THREE_NODE']='1';os.environ['HAPPY_NODE_TOKEN']=secrets.token_urlsafe(48)
     settings=Settings.environment()
+    settings.data_dir.mkdir(parents=True,exist_ok=True)
+    lock_path=settings.data_dir/'inference.lock'
+    with open(lock_path,'ab') as handle:
+        if handle.tell()==0:handle.write(b'0')
+    lock_path.chmod(0o600)
+    os.environ['HAPPY_INFERENCE_LOCK']=str(lock_path)
     if args.host not in {'127.0.0.1','localhost'} and not settings.secure_cookie:
         parser.error('External listening requires HAPPY_ORIGIN=https://your-host and HAPPY_SECURE_COOKIE=1 behind TLS.')
     try:

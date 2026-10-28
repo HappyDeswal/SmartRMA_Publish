@@ -1,3 +1,16 @@
+# Original workflow alignment - 28 October 2026
+
+- Preserved Node 1 intake/security/decision/history, Node 2 policy/text chat, and Node 3 vision responsibilities.
+- Node 2 now executes local text models directly; it no longer depends on Node 3 for policy chat.
+- Both inference processes use a shared operating-system file lock, tested for contention and process-exit recovery.
+- Return order is verified: Node 3 inspection, then Node 2 policy, then Node 1 decision/history.
+- 109 software tests passed. 24 decision fixtures matched the original gateway functions.
+- Architecture page and README now describe the aligned roles and distinguish storage/queue/security improvements.
+- Live Node 2 chat completed using local qwen2.5:7b, with all three services and the trained classifier healthy.
+- Detailed scope and evidence: docs/WORKFLOW_PARITY.md and docs/workflow_parity_results.json.
+
+---
+
 # Hardware training and local integration verification - 28 October 2026
 
 - Trained an auxiliary MobileNetV3 Small hardware classifier on Colab Tesla T4.

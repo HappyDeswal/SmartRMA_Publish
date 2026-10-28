@@ -1,4 +1,4 @@
-"""Node 2 policy/retrieval and Node 3 local inference entry points."""
+"""Node 2 policy/text inference and Node 3 vision inference entry points."""
 import argparse,base64,binascii,os,secrets,time
 from fastapi import FastAPI,Request,HTTPException
 from fastapi.responses import JSONResponse,FileResponse
@@ -7,7 +7,7 @@ from .domain import StrictModel,Observation,Product
 from .images import validate_photo
 from .models import LocalModels,ModelBusy,ModelUnavailable
 from .policy import Policies
-from .nodes import NodeTransport,PORTS
+from .nodes import PORTS
 
 class InspectInput(StrictModel):
     image:str=Field(max_length=14*1024*1024)
@@ -56,7 +56,7 @@ def create_service(role,token=None,models=None,policies=None):
     if len(token)<32:raise RuntimeError('A private internal node token is required.')
     app=FastAPI(title='SmartRMA '+role+' node',docs_url=None,redoc_url=None,openapi_url=None)
     app.add_middleware(InternalBoundary,token=token)
-    models=models or (LocalModels() if role=='vision' else None)
+    models=models or LocalModels(role=role)
     policies=policies or (Policies() if role=='policy' else None)
     @app.exception_handler(ModelBusy)
     async def busy(request,exc):return JSONResponse({'detail':str(exc)},status_code=409)
@@ -64,16 +64,17 @@ def create_service(role,token=None,models=None,policies=None):
     async def unavailable(request,exc):return JSONResponse({'detail':str(exc)},status_code=503)
     @app.get('/health')
     def health():return {'status':'ok','application':'happy_project','role':role,'port':PORTS[role]}
+    @app.get('/models')
+    def inventory():return models.health()
     if role=='vision':
-        @app.get('/models')
-        def inventory():return models.health()
         @app.post('/inspect')
         def inspect(body:InspectInput):
             obs,model=models.inspect(decode(body.image),time.monotonic()+body.budget)
             return {'observation':obs.model_dump(),'model':model}
         @app.post('/text')
         def text(body:TextInput):
-            result,model=models.text(body.prompt,decode(body.image) if body.image is not None else None)
+            if body.image is None:raise HTTPException(422,'Policy text requests belong to Node 2.')
+            result,model=models.text(body.prompt,decode(body.image))
             return {'result':result,'model':model}
     else:
         @app.get('/catalog')
@@ -90,7 +91,8 @@ def create_service(role,token=None,models=None,policies=None):
         @app.post('/text')
         def text(body:TextInput):
             if body.image is not None:raise HTTPException(422,'Image questions belong to Node 3.')
-            return NodeTransport('vision',token).call('/text',body.model_dump(),timeout=125)
+            result,model=models.text(body.prompt)
+            return {'result':result,'model':model}
     return app
 
 def main():

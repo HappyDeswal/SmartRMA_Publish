@@ -13,7 +13,8 @@ class ThreeNodeTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory(prefix='happy-three-tests-');self.token='test-node-token-'+'x'*40
         self.env=patch.dict(os.environ,{'HAPPY_NODE_TOKEN':self.token});self.env.start();self.models=FakeModels()
-        self.vision=TestClient(create_service('vision',self.token,models=self.models));self.policy=TestClient(create_service('policy',self.token));self.vision.__enter__();self.policy.__enter__()
+        self.policy_models=FakeModels()
+        self.vision=TestClient(create_service('vision',self.token,models=self.models));self.policy=TestClient(create_service('policy',self.token,models=self.policy_models));self.vision.__enter__();self.policy.__enter__()
         self.down=set();self.calls=[]
         def route(*args,**kwargs):
             port=httpx.URL(kwargs['base_url']).port
@@ -43,8 +44,15 @@ class ThreeNodeTests(unittest.TestCase):
         self.down.clear();self.assertEqual(self.gateway.post('/api/cases/'+ident+'/retry',headers=self.headers).status_code,200);self.gateway.app.state.worker.run_once();self.assertEqual(self.gateway.get('/api/cases/'+ident).json()['status'],'approved')
     def test_policy_outage_is_failed_job_not_approval(self):
         ident=self.submit();self.down.add(8011);self.gateway.app.state.worker.run_once();case=self.gateway.get('/api/cases/'+ident).json();self.assertEqual(case['job']['status'],'failed');self.assertIsNone(case['decision'])
-    def test_chat_routes_policy_then_shared_model_node(self):
-        result=self.gateway.post('/api/chat',headers=self.headers,json={'message':'Explain NVIDIA warranty proof of purchase.'});self.assertEqual(result.status_code,200,result.text);self.assertEqual(result.json()['model'],'test_local_fixture');self.assertIn(8011,self.calls);self.assertIn(8012,self.calls)
+    def test_chat_executes_on_policy_node_without_vision_node(self):
+        self.down.add(8012)
+        result=self.gateway.post('/api/chat',headers=self.headers,json={'message':'Explain NVIDIA warranty proof of purchase.'});self.assertEqual(result.status_code,200,result.text);self.assertEqual(result.json()['model'],'test_local_fixture');self.assertIn(8011,self.calls);self.assertNotIn(8012,self.calls)
+    def test_return_inspects_before_policy_evaluation(self):
+        self.submit();self.calls.clear();self.gateway.app.state.worker.run_once()
+        self.assertEqual(self.calls,[8012,8011])
+    def test_vision_node_rejects_policy_text_requests(self):
+        result=self.vision.post('/text',json={'prompt':'Explain warranty.'},headers={'X-Happy-Node-Token':self.token})
+        self.assertEqual(result.status_code,422)
     def test_question_uses_vision_node_and_saved_photo(self):
         ident=self.submit();self.gateway.app.state.worker.run_once();case=self.gateway.get('/api/cases/'+ident).json();result=self.gateway.post('/api/vision/question',headers=self.headers,json={'image_id':case['photos'][0]['id'],'question':'Describe the connector.'});self.assertEqual(result.status_code,200)
     def test_policy_sources_proxy_pdf_and_text(self):

@@ -4,7 +4,7 @@
 
 **SmartRMA** is a local hardware-return screening application built with **Python, FastAPI, SQLite, HTML, CSS and JavaScript**. Upload original product photos, inspect them with a locally installed vision model, retrieve manufacturer policy passages, and retain the evidence and decision in signed case history.
 
-The application runs **three separate backend processes**. All model inference goes through **local Ollama**. No hosted AI provider, cloud inference endpoint or AI API key is supported. Local HTTP APIs connect the browser, nodes and Ollama.
+The application runs **three separate backend processes**. Vision and text LLM inference goes through **local Ollama**; the optional trained hardware classifier runs in local ONNX Runtime. No hosted AI provider, cloud inference endpoint or AI API key is supported. Local HTTP APIs connect the browser, nodes and Ollama.
 
 ## Three-node workflow
 
@@ -12,8 +12,8 @@ The application runs **three separate backend processes**. All model inference g
 flowchart TD
     Browser[Browser workspace] --> Gateway[Node 1 · Gateway and decisions · 8010]
     Gateway --> Vision[Node 3 · Vision and local inference · 8012]
-    Gateway --> Policy[Node 2 · Policy retrieval and chat relay · 8011]
-    Policy --> Vision
+    Gateway --> Policy[Node 2 · Policy retrieval and local text LLM · 8011]
+    Policy --> Ollama
     Vision --> Ollama[Local Ollama · 11434]
     Gateway --> Store[Private SQLite · original photos and signed history]
 ```
@@ -21,10 +21,10 @@ flowchart TD
 | Component | Responsibility |
 |---|---|
 | **Node 1** | Serves the UI, validates uploads, saves durable jobs, coordinates the other nodes, applies decision rules, and owns the database and audit history. Runs no LLM. |
-| **Node 2** | Retrieves manufacturer-specific policy passages with document/page citations and relays policy-chat requests to Node 3. Current retrieval uses lexical keyword scoring. |
-| **Node 3** | Inspects photos, answers selected-photo questions and executes local language-model requests through a shared inference lock. |
+| **Node 2** | Retrieves manufacturer-specific policy passages with document/page citations and executes policy chat through its own local Ollama text-model client. Current retrieval uses lexical keyword scoring. |
+| **Node 3** | Inspects photos and answers selected-photo questions with local vision models. Its inference lock is shared with Node 2 to prevent competing model loads. |
 
-Inspection follows **Node 1 → Node 3 → Node 1 → Node 2 → Node 1 decision**. Policy chat follows **Node 1 → Node 2 → Node 3**. The architecture page shows this flow and live node health; its replay is illustrative, not request telemetry.
+Inspection follows **Node 1 → Node 3 → Node 1 → Node 2 → Node 1 decision**. Policy chat follows **Node 1 → Node 2 → local Ollama text model**. The architecture page shows this flow and live node health; its replay is illustrative, not request telemetry.
 
 ## Requirements
 
@@ -201,3 +201,5 @@ vision LLM still assesses visible condition. Recognition scores do not replace
 condition confidence, affect return decisions, or bypass T4 human approval.
 See the training documentation for attribution, measured results and dataset
 limits. Training data and weights are excluded from source commits.
+
+The [workflow parity comparison](docs/WORKFLOW_PARITY.md) maps the original and rebuilt node responsibilities and distinguishes preserved behavior from implementation improvements.
