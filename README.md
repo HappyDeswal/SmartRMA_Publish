@@ -203,7 +203,3 @@ See the training documentation for attribution, measured results and dataset
 limits. Training data and weights are excluded from source commits.
 
 The [workflow parity comparison](docs/WORKFLOW_PARITY.md) maps the original and rebuilt node responsibilities and distinguishes preserved behavior from implementation improvements.
-
-## Journal result figures
-
-Measured, reproducible plots for this rebuilt project are available in [figures/](figures/README.md), with PNG/PDF/SVG exports, captions, probability evidence and a generation script. They cover hardware recognition on 145 test images (84.14% accuracy), not damage or end-to-end RMA accuracy. Per-class tradeoffs and dataset limitations are documented alongside the plots.
