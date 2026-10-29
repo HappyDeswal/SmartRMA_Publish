@@ -1,0 +1,22 @@
+{
+  "graphics_card": {
+    "roc_auc_ovr": 0.9151817533856024,
+    "average_precision": 0.7602967876605191,
+    "positives": 23
+  },
+  "motherboard": {
+    "roc_auc_ovr": 0.9554574638844302,
+    "average_precision": 0.9303821895382255,
+    "positives": 56
+  },
+  "ram": {
+    "roc_auc_ovr": 0.9789405123751628,
+    "average_precision": 0.9616800473538498,
+    "positives": 47
+  },
+  "ssd": {
+    "roc_auc_ovr": 1.0,
+    "average_precision": 1.0,
+    "positives": 19
+  }
+}
